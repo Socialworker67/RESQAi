@@ -16,7 +16,11 @@ interface DemoContextType {
   aiAgentOnline: boolean;
   dbOnline: boolean;
   simReady: boolean;
-  activeTab: string; // Live vision tab: 'LIVE', 'VIDEO', 'SIMULATION'
+  activeTab: string; // Live vision tab: 'LIVE', 'VIDEO', 'SIMULATION', 'DATASET'
+  isPresentationMode: boolean;
+  setPresentationMode: (mode: boolean) => void;
+  setActiveTab: (tab: string) => void;
+  setActiveIncidentId: (id: string) => void;
   triggerReplan: () => void;
   blockExit: () => void;
   increaseRisk: () => void;
@@ -35,12 +39,13 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     { time: '14:30:00', message: 'System Initialized. CV Models Loaded.', type: 'system' },
     { time: '14:30:15', message: 'Perception Layer Online (D-Fire, BDD100K, MVTec AD, xBD, ShanghaiTech)', type: 'info' }
   ]);
-  const [activeIncidentId, setActiveIncidentId] = useState<string>('INC-2026-001');
+  const [activeIncidentId, setActiveIncidentId] = useState<string>('INC-2026-005'); // Default to Crowd Crush
   const [isDemoRunning, setIsDemoRunning] = useState<boolean>(false);
   const [demoStep, setDemoStep] = useState<number>(0);
   const [isExitBlocked, setIsExitBlocked] = useState<boolean>(false);
   const [activePlanVersion, setActivePlanVersion] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<string>('LIVE');
+  const [isPresentationMode, setIsPresentationMode] = useState<boolean>(false);
 
   // Node engine states
   const [cvEngineOnline, setCvEngineOnline] = useState<boolean>(true);
@@ -59,14 +64,14 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Reset function
   const resetDemo = () => {
     if (demoIntervalRef.current) {
-      clearInterval(demoIntervalRef.current);
+      clearTimeout(demoIntervalRef.current);
       demoIntervalRef.current = null;
     }
     setIsDemoRunning(false);
     setDemoStep(0);
     setIsExitBlocked(false);
     setActivePlanVersion(1);
-    setActiveIncidentId('INC-2026-001');
+    setActiveIncidentId('INC-2026-005'); // default back to crowd
     setIncidents(initialIncidents.map(inc => ({ ...inc })));
     setTeams(initialTeams.map(t => ({ ...t })));
     setLogs([
@@ -85,8 +90,16 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const blockExit = () => {
     if (isExitBlocked) return;
     setIsExitBlocked(true);
-    addLog('Incident route obstruction: EXIT B BLOCKED!', 'warning');
-    addLog('AI Agent -> STATE CHANGE DETECTED', 'alert');
+
+    const activeIncident = incidents.find(i => i.incident_id === activeIncidentId) || incidents[0];
+    
+    if (activeIncident.disaster_type === 'CROWD') {
+      addLog('Telemetry Alert: GATE B plaza capacity saturated. Ingress/egress bottleneck detected.', 'warning');
+      addLog('AI Agent -> STATE CHANGE REGISTERED (Gate B Congested)', 'alert');
+    } else {
+      addLog('Telemetry Alert: EXIT B access corridor obstructed by debris.', 'warning');
+      addLog('AI Agent -> STATE CHANGE REGISTERED (Exit B Blocked)', 'alert');
+    }
     
     // Automatically trigger re-planning if not running demo
     if (!isDemoRunning) {
@@ -110,26 +123,41 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTimeout(() => {
       setIncidents(prev => prev.map(inc => {
         if (inc.incident_id === activeIncidentId) {
-          return {
-            ...inc,
-            status: 'ACTING',
-            plan_version: 2,
-            current_plan: 'Exit B is blocked. Re-routing evacuation via Exit C. Fire Team 02 retained. Medical Team 01 reassigned to Exit C.',
-            assigned_teams: ['Fire Team 02', 'Medical Team 01']
-          };
+          if (inc.disaster_type === 'CROWD') {
+            return {
+              ...inc,
+              status: 'ACTING',
+              plan_version: 2,
+              current_plan: 'Gate B is congested. Shift evacuation flow to Gate C. Dispatch Medical Team 01 for staging. Police Team 02 staging active. Rescue Team 01 staging active.',
+              assigned_teams: ['Police Team 02', 'Rescue Team 01', 'Medical Team 01']
+            };
+          } else {
+            // Fire fallback
+            return {
+              ...inc,
+              status: 'ACTING',
+              plan_version: 2,
+              current_plan: 'Exit B is blocked. Re-routing evacuation via Exit C. Fire Team 02 retained. Medical Team 01 reassigned to Exit C.',
+              assigned_teams: ['Fire Team 02', 'Medical Team 01']
+            };
+          }
         }
         return inc;
       }));
+
       setTeams(prev => prev.map(t => {
         if (t.id === 'T-MED-01') {
           return { ...t, status: 'Assigned', current_incident: activeIncidentId, eta: '3 min' };
         }
+        if (activeIncidentId === 'INC-2026-005' && t.id === 'T-RESC-01') {
+          return { ...t, status: 'Assigned', current_incident: activeIncidentId, eta: '5 min' };
+        }
         return t;
       }));
       setActivePlanVersion(2);
-      addLog('Route planner recalculation -> EXIT C selected.', 'info');
-      addLog('Medical Team 01 reassigned to Exit C.', 'info');
-      addLog('AI Plan v2 activated.', 'system');
+      addLog('Route Recalculation -> Alternative exit GATE C designated.', 'info');
+      addLog('Medical Team 01 deployed to staging zone Gate C.', 'info');
+      addLog('AI Response Plan v2 activated.', 'system');
     }, 2000);
   };
 
@@ -137,7 +165,7 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIncidents(prev => prev.map(inc => {
       if (inc.incident_id === activeIncidentId) {
         addLog(`Incident ${inc.incident_id} risk severity escalated to CRITICAL!`, 'alert');
-        return { ...inc, severity: 'CRITICAL', confidence: Math.min(99.9, inc.confidence + 4.5) };
+        return { ...inc, severity: 'CRITICAL', confidence: Math.min(99.9, inc.confidence + 3.1) };
       }
       return inc;
     }));
@@ -146,8 +174,8 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const completeIncident = () => {
     setIncidents(prev => prev.map(inc => {
       if (inc.incident_id === activeIncidentId) {
-        addLog(`Incident ${inc.incident_id} marked as RESOLVED. All evacuees safe.`, 'system');
-        return { ...inc, status: 'RESOLVED', severity: 'SAFE' };
+        addLog(`Incident ${inc.incident_id} marked as RESOLVED. Risk level stabilized.`, 'system');
+        return { ...inc, status: 'RESOLVED', severity: 'SAFE', people_at_risk: 0 };
       }
       return inc;
     }));
@@ -169,6 +197,10 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const setPresentationMode = (mode: boolean) => {
+    setIsPresentationMode(mode);
+  };
+
   // Run the 10-step demo
   const startDemo = () => {
     resetDemo();
@@ -180,7 +212,7 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!isDemoRunning || demoStep === 0) return;
 
-    const stepDuration = 6000; // 6 seconds per step
+    const stepDuration = 5500; // 5.5 seconds per step
 
     demoIntervalRef.current = setTimeout(() => {
       const nextStep = demoStep + 1;
@@ -192,139 +224,148 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setDemoStep(nextStep);
     }, stepDuration);
 
-    // Apply side-effects for each step
+    // Apply side-effects for each step of the CROWD CRUSH scenario
     switch (demoStep) {
       case 1:
-        // FIRE Detected
-        setActiveIncidentId('INC-2026-001');
+        // CROWD detected
+        setActiveIncidentId('INC-2026-005');
         setActiveTab('LIVE');
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
-            return { ...inc, status: 'DETECTED', severity: 'CRITICAL', plan_version: 1, people_at_risk: 0 };
+          if (inc.incident_id === 'INC-2026-005') {
+            return { ...inc, status: 'DETECTED', severity: 'MODERATE', plan_version: 1, people_at_risk: 0 };
           }
           return inc;
         }));
-        addLog('Vision event received: Thermal anomaly registered.', 'warning');
-        addLog('Fire + Smoke detection model YOLOv8: Confidence = 94.2%', 'info');
-        addLog('Incident INC-2026-001 (Building A Fire) created.', 'alert');
+        addLog('Sensory event received: Crowd gathering registered at Stadium Gate B.', 'warning');
+        addLog('Perception model (ShanghaiTech-CSRNet) loading inference frame...', 'info');
         break;
       
       case 2:
-        // People at risk
+        // 1,284 people detected
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
-            return { ...inc, status: 'UNDERSTANDING', people_at_risk: 17 };
+          if (inc.incident_id === 'INC-2026-005') {
+            return { ...inc, status: 'UNDERSTANDING', people_at_risk: 1284, severity: 'HIGH' };
           }
           return inc;
         }));
-        addLog('Object Tracking: 17 occupants identified within affected building segment.', 'info');
-        addLog('Threat Profile: Floor 2 evacuation route threatened by smoke.', 'warning');
+        addLog('ShanghaiTech Inference: Estimated headcount = 1,284 occupants in entrance plaza.', 'info');
+        addLog('Threat Profile: High crowd ingress rate through Gate B funnel.', 'warning');
         break;
       
       case 3:
-        // Risk assessment Critical
+        // Density threshold exceeded
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
+          if (inc.incident_id === 'INC-2026-005') {
+            return { ...inc, status: 'ASSESSING', density: '8.7 persons/m²' };
+          }
+          return inc;
+        }));
+        addLog('YOLO point density check: Estimated density is 8.7 persons/m².', 'warning');
+        addLog('Critical Warning: Safety threshold (4.0 persons/m²) exceeded!', 'alert');
+        break;
+      
+      case 4:
+        // Risk = CRITICAL
+        setIncidents(prev => prev.map(inc => {
+          if (inc.incident_id === 'INC-2026-005') {
             return { ...inc, status: 'ASSESSING', severity: 'CRITICAL' };
           }
           return inc;
         }));
-        addLog('Agentic AI: Risk Score = 9.8/10 (CRITICAL). Evacuation corridors compromised.', 'alert');
+        addLog('Agentic AI Risk Assessment: Critical crowd pressure warning (Risk Score 9.6/10).', 'alert');
         break;
       
-      case 4:
-        // Fire Team assigned
+      case 5:
+        // Gate B selected
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
+          if (inc.incident_id === 'INC-2026-005') {
             return { ...inc, status: 'PLANNING' };
           }
           return inc;
         }));
         setTeams(prev => prev.map(t => {
-          if (t.id === 'T-FIRE-02') {
-            return { ...t, status: 'Assigned', current_incident: 'INC-2026-001', eta: '4 min' };
+          if (t.id === 'T-POL-02') {
+            return { ...t, status: 'Assigned', current_incident: 'INC-2026-005', eta: '3 min' };
           }
           return t;
         }));
-        addLog('Response Planner: Recommended resource Fire Team 02 assigned.', 'info');
+        addLog('Response Planner: AI Plan v1 generated. Selected Exit Route: Gate B.', 'info');
+        addLog('Resource Dispatch: Police Team 02 assigned to Gate B for flow control.', 'info');
         break;
       
-      case 5:
-        // Exit B selected
+      case 6:
+        // Gate B congested detected
+        setIsExitBlocked(true);
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
+          if (inc.incident_id === 'INC-2026-005') {
             return { ...inc, status: 'ACTING' };
           }
           return inc;
         }));
-        addLog('Route Planner: Exit B designated as optimal evacuation route.', 'info');
-        addLog('AI Plan v1 broadcast to emergency team.', 'system');
-        break;
-      
-      case 6:
-        // Exit B blocked
-        setIsExitBlocked(true);
-        addLog('Sensory Check: Debris fall blocks access to EXIT B corridor.', 'warning');
-        addLog('AI Agent -> STATE CHANGE DETECTED: Route Invalidated.', 'alert');
+        addLog('Real-time Telemetry: Gate B entrance flow restricted. Exit capacity low.', 'warning');
+        addLog('AI Agent -> STATE CHANGE DETECTED: Gate B Congested!', 'alert');
         break;
       
       case 7:
-        // AI Re-planning
+        // AI RE-PLANNING
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
+          if (inc.incident_id === 'INC-2026-005') {
             return { ...inc, status: 'REPLANNING' };
           }
           return inc;
         }));
-        addLog('AI Agent: Initiating dynamic route recalculation.', 'system');
+        addLog('AI Agent: Initiating dynamic route and resource re-planning cycle.', 'system');
         break;
       
       case 8:
-        // Exit C selected
-        addLog('Route Recalculated: Alternative path via EXIT C selected.', 'info');
-        addLog('Resource Check: Medical Team 01 dispatched to Exit C staging zone.', 'info');
+        // Gate C selected
+        addLog('Route Recalculation: Optimal alternative Exit Gate C designated (Exit capacity normal).', 'info');
+        addLog('Resource check: Dispatching Medical Team 01 to Gate C staging area.', 'info');
         break;
       
       case 9:
-        // Plan v1 -> Plan v2
+        // Plan v1 -> v2
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
+          if (inc.incident_id === 'INC-2026-005') {
             return {
               ...inc,
               status: 'ACTING',
               plan_version: 2,
-              current_plan: 'EXIT B blocked. Shift evacuation to EXIT C. Fire Team 02 suppression active. Medical Team 01 staging at exit.',
-              assigned_teams: ['Fire Team 02', 'Medical Team 01']
+              current_plan: 'Gate B congested. Shift evacuation flow to Gate C. Dispatch Medical Team 01 for staging. Crowd Control Team retained.',
+              assigned_teams: ['Police Team 02', 'Rescue Team 01', 'Medical Team 01']
             };
           }
           return inc;
         }));
         setTeams(prev => prev.map(t => {
           if (t.id === 'T-MED-01') {
-            return { ...t, status: 'Assigned', current_incident: 'INC-2026-001', eta: '3 min' };
+            return { ...t, status: 'Assigned', current_incident: 'INC-2026-005', eta: '2 min' };
+          }
+          if (t.id === 'T-RESC-01') {
+            return { ...t, status: 'Assigned', current_incident: 'INC-2026-005', eta: '4 min' };
           }
           return t;
         }));
         setActivePlanVersion(2);
-        addLog('AI Response Plan v2 activated.', 'system');
+        addLog('Plan Evolution: Plan v2 activated. Re-routing flow to Gate C.', 'system');
         break;
       
       case 10:
-        // Incident Controlled
+        // Response stabilized
         setIncidents(prev => prev.map(inc => {
-          if (inc.incident_id === 'INC-2026-001') {
+          if (inc.incident_id === 'INC-2026-005') {
             return { ...inc, status: 'RESOLVED', severity: 'SAFE', people_at_risk: 0 };
           }
           return inc;
         }));
         setTeams(prev => prev.map(t => {
-          if (t.current_incident === 'INC-2026-001') {
+          if (t.current_incident === 'INC-2026-005') {
             return { ...t, status: 'Available', current_incident: undefined, eta: undefined };
           }
           return t;
         }));
-        addLog('EOC Confirmation: Building A fire suppressed. All 17 occupants safely evacuated.', 'system');
-        addLog('Incident INC-2026-001 resolved successfully.', 'info');
+        addLog('EOC Confirmation: Crowd density reduced to 2.1 persons/m². Bottleneck resolved.', 'system');
+        addLog('Incident INC-2026-005 successfully stabilized. All occupants safe.', 'info');
         break;
     }
 
@@ -349,6 +390,10 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         dbOnline,
         simReady,
         activeTab,
+        isPresentationMode,
+        setPresentationMode,
+        setActiveTab,
+        setActiveIncidentId,
         triggerReplan,
         blockExit,
         increaseRisk,

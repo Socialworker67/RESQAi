@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDemo } from '../state/DemoContext';
-import { Users, Truck, AlertTriangle, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Users, Truck } from 'lucide-react';
 
 export const EmergencyTeams: React.FC = () => {
   const { teams } = useDemo();

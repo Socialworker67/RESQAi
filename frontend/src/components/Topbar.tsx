@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { useDemo } from '../state/DemoContext';
-import { Activity, ShieldAlert, Cpu, Database, Play } from 'lucide-react';
+import { 
+  Bell, 
+  Settings, 
+  Cpu, 
+  Activity, 
+  Database, 
+  Play, 
+  ChevronRight
+} from 'lucide-react';
 
 export const Topbar: React.FC = () => {
   const { cvEngineOnline, aiAgentOnline, dbOnline, simReady } = useDemo();
   const [time, setTime] = useState<string>(new Date().toISOString());
+  const location = useLocation();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -13,74 +23,122 @@ export const Topbar: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const formattedTime = time.replace('T', ' ').substring(0, 19) + ' UTC';
+  const formattedTime = time.replace('T', ' ').substring(0, 19) + ' LOCAL';
+
+  // Map route pathname to friendly breadcrumb
+  const getPageTitle = (path: string) => {
+    const segments = path.split('/');
+    const primary = segments[1];
+    
+    switch (primary) {
+      case 'command-center': return 'Command Center';
+      case 'incidents': return 'Active Incidents';
+      case 'live-detection': return 'Live Detection';
+      case 'disaster-scenarios': return 'Disaster Scenarios';
+      case 'ai-commander': return 'AI Commander';
+      case 'response-planning': return 'Response Planning';
+      case 'teams': return 'Emergency Teams';
+      case 'map': return 'Operations Map';
+      case 'datasets-models': return 'Datasets & Models';
+      case 'reports': return 'Reports';
+      case 'analytics': return 'Analytics';
+      case 'settings': return 'Settings';
+      default: return 'Command Center';
+    }
+  };
+
+  const pageTitle = getPageTitle(location.pathname);
 
   return (
-    <header className="border-b border-navyLight bg-navyDark/90 backdrop-blur-md px-6 py-3 flex items-center justify-between z-10 sticky top-0">
-      <div className="flex items-center space-x-3">
-        <div className="relative">
-          <div className="absolute -inset-1 rounded-full bg-accentCyan/20 blur-sm animate-pulse-slow"></div>
-          <ShieldAlert className="h-6 w-6 text-accentCyan relative" />
+    <header className="border-b border-borderMuted bg-navyMedium/95 backdrop-blur-md px-6 py-3.5 flex items-center justify-between z-40 sticky top-0 h-[65px] select-none">
+      
+      {/* Left: Breadcrumbs */}
+      <div className="flex items-center space-x-2 font-mono">
+        <Link 
+          to="/command-center"
+          className="text-textMuted hover:text-textSecondary font-black text-xs tracking-wider"
+        >
+          RESQAi
+        </Link>
+        <ChevronRight className="h-3 w-3 text-textMuted" />
+        <span className="text-accentCyan font-bold text-xs tracking-wide">
+          {pageTitle}
+        </span>
+      </div>
+
+      {/* Center: System Status heartbeats */}
+      <div className="hidden lg:flex items-center space-x-6 text-[10px] font-mono border-x border-borderMuted px-6">
+        <div className="flex items-center space-x-2">
+          <Cpu className={`h-3.5 w-3.5 ${cvEngineOnline ? 'text-brandGreen' : 'text-brandRed animate-pulse'}`} />
+          <span className="text-textMuted uppercase">CV ENGINE</span>
+          <span className={cvEngineOnline ? 'text-brandGreen font-bold' : 'text-brandRed font-bold animate-pulse'}>
+            {cvEngineOnline ? 'ONLINE' : 'OFFLINE'}
+          </span>
         </div>
-        <div>
-          <span className="font-mono text-xs font-bold tracking-widest text-accentCyan uppercase">Live Operational Console</span>
-          <h1 className="text-xl font-bold tracking-tight text-slate-100 flex items-center">
-            RESQA<span className="text-accentCyan font-extrabold">i</span>
-            <span className="ml-2 text-[10px] bg-accentCyan/10 border border-accentCyan/30 text-accentCyan px-1.5 py-0.5 rounded font-mono font-medium">v1.0-PROTOTYPE</span>
-          </h1>
+
+        <div className="flex items-center space-x-2">
+          <Activity className={`h-3.5 w-3.5 ${aiAgentOnline ? 'text-brandGreen animate-pulse-slow' : 'text-brandRed animate-pulse'}`} />
+          <span className="text-textMuted uppercase">AI COMMANDER</span>
+          <span className={aiAgentOnline ? 'text-brandGreen font-bold' : 'text-brandRed font-bold animate-pulse'}>
+            {aiAgentOnline ? 'ONLINE' : 'OFFLINE'}
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Database className={`h-3.5 w-3.5 ${dbOnline ? 'text-brandGreen' : 'text-brandRed'}`} />
+          <span className="text-textMuted uppercase">DATABASE</span>
+          <span className={dbOnline ? 'text-brandGreen font-bold' : 'text-brandRed font-bold'}>
+            {dbOnline ? 'ONLINE' : 'DEGRADED'}
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Play className={`h-3.5 w-3.5 ${simReady ? 'text-accentCyan' : 'text-textMuted'}`} />
+          <span className="text-textMuted uppercase">SIMULATION</span>
+          <span className={simReady ? 'text-accentCyan font-bold' : 'text-textMuted font-semibold'}>
+            {simReady ? 'READY' : 'OFFLINE'}
+          </span>
         </div>
       </div>
 
-      {/* Clock and system heartbeats */}
-      <div className="flex items-center space-x-6">
-        <div className="font-mono text-sm text-slate-400 bg-navyMedium border border-navyLight px-3 py-1.5 rounded select-none">
+      {/* Right: Clock & User Avatar */}
+      <div className="flex items-center space-x-4">
+        {/* Clock */}
+        <div className="font-mono text-xs text-textSecondary bg-navyLight border border-borderMuted px-3 py-1.5 rounded-lg select-none shadow-sm hidden md:block">
           {formattedTime}
         </div>
 
-        {/* Engine status indicators */}
-        <div className="hidden md:flex items-center space-x-4 text-xs font-mono">
-          <div className="flex items-center space-x-1.5">
-            <Cpu className={`h-3.5 w-3.5 ${cvEngineOnline ? 'text-brandGreen' : 'text-brandRed animate-pulse'}`} />
-            <span className="text-slate-400">CV Engine:</span>
-            <span className={cvEngineOnline ? 'text-brandGreen font-semibold' : 'text-brandRed font-semibold'}>
-              {cvEngineOnline ? 'ONLINE' : 'OFFLINE'}
-            </span>
-          </div>
+        {/* Action icons */}
+        <div className="flex items-center space-x-2 border-l border-borderMuted pl-4">
+          <button 
+            className="p-1.5 text-textMuted hover:text-textSecondary hover:bg-navyLight rounded-lg transition-colors relative cursor-pointer"
+            onClick={() => alert("Notification center is operational. No critical errors detected.")}
+          >
+            <Bell className="h-4.5 w-4.5" />
+            <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-brandRed animate-pulse"></span>
+          </button>
 
-          <div className="flex items-center space-x-1.5">
-            <Activity className={`h-3.5 w-3.5 ${aiAgentOnline ? 'text-brandGreen animate-pulse-slow' : 'text-brandRed animate-pulse'}`} />
-            <span className="text-slate-400">AI Commander:</span>
-            <span className={aiAgentOnline ? 'text-brandGreen font-semibold' : 'text-brandRed font-semibold'}>
-              {aiAgentOnline ? 'ACTIVE' : 'OFFLINE'}
-            </span>
-          </div>
+          <Link 
+            to="/settings" 
+            className="p-1.5 text-textMuted hover:text-textSecondary hover:bg-navyLight rounded-lg transition-colors cursor-pointer"
+          >
+            <Settings className="h-4.5 w-4.5" />
+          </Link>
+        </div>
 
-          <div className="flex items-center space-x-1.5">
-            <Database className={`h-3.5 w-3.5 ${dbOnline ? 'text-brandGreen' : 'text-brandRed'}`} />
-            <span className="text-slate-400">Database:</span>
-            <span className={dbOnline ? 'text-brandGreen font-semibold' : 'text-brandRed font-semibold'}>
-              {dbOnline ? 'ONLINE' : 'DEGRADED'}
-            </span>
+        {/* Operator initials badge */}
+        <div className="flex items-center space-x-2.5 border-l border-borderMuted pl-4">
+          <div className="flex flex-col text-right leading-tight hidden sm:block">
+            <span className="text-[9px] text-textMuted uppercase font-semibold">Human-in-the-loop</span>
+            <span className="text-xs font-bold text-textPrimary">EP Operator</span>
           </div>
-
-          <div className="flex items-center space-x-1.5">
-            <Play className={`h-3.5 w-3.5 ${simReady ? 'text-brandGreen' : 'text-slate-500'}`} />
-            <span className="text-slate-400">Simulation:</span>
-            <span className={simReady ? 'text-accentCyan font-semibold' : 'text-slate-500 font-semibold'}>
-              {simReady ? 'READY' : 'OFFLINE'}
-            </span>
+          <div className="h-8 w-8 rounded-lg bg-accentCyan/10 border border-accentCyan/30 text-accentCyan flex items-center justify-center font-bold text-xs select-none shadow-cyberCyan/10">
+            EP
           </div>
         </div>
 
-        {/* Operator Badge */}
-        <div className="flex items-center space-x-2 border-l border-navyLight pl-4">
-          <div className="h-2 w-2 rounded-full bg-brandGreen animate-pulse"></div>
-          <div className="text-left leading-none">
-            <p className="text-[10px] text-slate-400 uppercase font-mono tracking-wider">Human-in-the-loop</p>
-            <p className="text-xs font-semibold text-slate-200">EOC Operator</p>
-          </div>
-        </div>
       </div>
     </header>
   );
 };
+export default Topbar;

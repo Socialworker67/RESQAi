@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useDemo } from '../state/DemoContext';
-import { Shield, ChevronLeft, Calendar, User, Compass, Server, CheckCircle, Flame, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Flame, AlertCircle } from 'lucide-react';
 
 export const IncidentDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
