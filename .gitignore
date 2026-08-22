@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment
+.env
+.env.*
+
+# Local AI / IDE
+.gemini/
+
+# Datasets
+dataset/
+datasets/
+ShanghaiTech/
+*.zip
+
+# Logs
+*.log
